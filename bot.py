@@ -9,7 +9,7 @@ from flask import Flask
 from threading import Thread
 
 # Konfiqurasiya
-BOT_TOKEN = "8421111075:AAGCv5a7M1YyrCrHsrSll780ca17dNDHKKI"
+BOT_TOKEN = "8421111075:AAHgXuErU8P8pao0YE_uaPWDhiMk066QKMg"
 BOT_NAME = "@CroniqueBot".lower()
 
 # Bot və Dispatcher
