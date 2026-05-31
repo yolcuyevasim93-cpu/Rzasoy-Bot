@@ -311,23 +311,24 @@ def update_score(cid, uid, uname):
     reytinq_db[cid][uid]["total"] += 1
     reytinq_db[cid][uid]["round"] += 1
 
+def get_game_kb():
+    b = InlineKeyboardBuilder()
+    b.add(types.InlineKeyboardButton(text="Sözə Baxmaq 🔍", callback_data="soze_bax"))
+    b.add(types.InlineKeyboardButton(text="Fikrimi Dəyişdim ❌", callback_data="fikrimi_deyisdim"))
+    b.add(types.InlineKeyboardButton(text="Növbəti Söz ♻️", callback_data="novbeti_soz"))
+    b.adjust(1)
+    return b.as_markup()
+
 async def yeni_raund(cid, uid=None, uname=None, mid=None):
-    # Oyun başlayanda cari raund xallarını sıfırla
-    if cid in reytinq_db:
-        for u in reytinq_db[cid]: reytinq_db[cid][u]["round"] = 0
-            
     sz = random.choice(SOZLER)
-    aktiv_oyunlar[cid] = {"soz": sz.lower().strip(), "orig": sz, "uid": uid, "un": uname, "st": "aktiv"}
+    aktiv_oyunlar[cid] = {"soz": sz.lower().strip(), "orig": sz, "uid": uid, "un": uname}
     txt = f'<a href="tg://user?id={uid}">{uname}</a> - sözü izah edir' if uid else "Oyun başladı!"
     
-    kb = InlineKeyboardBuilder()
-    kb.add(types.InlineKeyboardButton(text="Sözə Baxmaq 🔍", callback_data="soze_bax"))
-    
     if mid:
-        try: await bot.edit_message_text(chat_id=cid, message_id=mid, text=txt, reply_markup=kb.as_markup())
+        try: await bot.edit_message_text(chat_id=cid, message_id=mid, text=txt, reply_markup=get_game_kb())
         except: pass
     else:
-        await bot.send_message(chat_id=cid, text=txt, reply_markup=kb.as_markup())
+        await bot.send_message(chat_id=cid, text=txt, reply_markup=get_game_kb())
 
 @dp.message(Command("rating"))
 async def rating_menu(m: types.Message):
@@ -339,20 +340,12 @@ async def rating_menu(m: types.Message):
 @dp.callback_query(F.data.startswith("rank_"))
 async def show_rank(c: types.CallbackQuery):
     cid, mode = c.message.chat.id, c.data.split("_")[1]
-    if cid not in reytinq_db or not reytinq_db[cid]: 
-        return await c.answer("Məlumat yoxdur!", show_alert=True)
-    
+    if cid not in reytinq_db or not reytinq_db[cid]: return await c.answer("Məlumat yoxdur!", show_alert=True)
     users = sorted(reytinq_db[cid].items(), key=lambda x: x[1][mode], reverse=True)
     toplam_soz = sum(d['round'] for uid, d in reytinq_db[cid].items())
     
-    if mode == "round":
-        txt = f"🎯 <b>Cari Oyun Reytinqi</b>\n📍 Bu oyun boyu tapılan söz sayı: <b>{toplam_soz}</b>\n\n"
-    else:
-        txt = f"🏆 <b>Ümumi Reytinq (Top 20)</b>\n\n"
-    
-    for i, (uid, d) in enumerate(users[:20]):
-        txt += f"{i+1}. <a href='tg://user?id={uid}'>{d['name']}</a> - {d[mode]} qələbə\n"
-        
+    txt = f"🎯 <b>Cari Oyun Reytinqi</b>\n📍 Bu oyun boyu tapılan söz sayı: <b>{toplam_soz}</b>\n\n" if mode == "round" else "🏆 <b>Ümumi Reytinq (Top 20)</b>\n\n"
+    for i, (uid, d) in enumerate(users[:20]): txt += f"{i+1}. <a href='tg://user?id={uid}'>{d['name']}</a> - {d[mode]} qələbə\n"
     await c.message.edit_text(txt, disable_web_page_preview=True)
 
 @dp.message()
@@ -371,11 +364,20 @@ async def chk(m: types.Message):
             await m.answer(f"✅ Düzgündür! {uname} +1 qələbə qazandı.")
             await yeni_raund(cid, uid, uname)
 
-@dp.callback_query(F.data == "soze_bax")
-async def cb_soz(c: types.CallbackQuery):
+@dp.callback_query()
+async def cb(c: types.CallbackQuery):
     cid = c.message.chat.id
-    if cid in aktiv_oyunlar:
-        await c.answer(aktiv_oyunlar[cid]['orig'], show_alert=True)
+    if cid not in aktiv_oyunlar: return
+    g = aktiv_oyunlar[cid]
+    
+    if c.data == "soze_bax": await c.answer(g['orig'], show_alert=True)
+    elif c.data == "fikrimi_deyisdim": 
+        await c.message.edit_text(f"{g['un']} - aparıcılıqdan imtina etdi.")
+        del aktiv_oyunlar[cid]
+    elif c.data == "novbeti_soz":
+        sz = random.choice(SOZLER)
+        aktiv_oyunlar[cid].update({"soz": sz.lower().strip(), "orig": sz})
+        await c.answer(sz, show_alert=True)
 
 async def main():
     Thread(target=run_flask, daemon=True).start()
