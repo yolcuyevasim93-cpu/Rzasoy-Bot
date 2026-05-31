@@ -339,11 +339,17 @@ def get_game_kb(status="aktiv"):
     b.adjust(1)
     return b.as_markup()
 
-async def yeni_raund(cid, ...):
+# Sənin kodundakı yeni_raund funksiyasını bununla əvəz et (yəni '...' olan hissəni sil)
+async def yeni_raund(cid, uid, uname, mid=None):
     # Cari oyun reytinqini sıfırla
     if cid in reytinq_db:
-        for u in reytinq_db[cid]: reytinq_db[cid][u]["round"] = 0
+        for u in reytinq_db[cid]: 
+            reytinq_db[cid][u]["round"] = 0
+            
+    sz = random.choice(SOZLER)
+    aktiv_oyunlar[cid] = {"soz": sz.lower().strip(), "orig": sz, "uid": uid, "un": uname, "st": "aktiv"}
     # ... qalan kodlar ...
+
 
 # Oyun məntiqi
 async def yeni_raund(cid, uid, uname, mid=None):
@@ -455,11 +461,3 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
     
-    
-if __name__ == "__main__":
-    asyncio.run(main())
-    
-
-if __name__ == "__main__":
-    asyncio.run(main())
-                                         
