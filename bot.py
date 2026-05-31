@@ -334,16 +334,36 @@ async def yeni_raund(cid, uid=None, uname=None, mid=None, status="aktiv"):
     else:
         await bot.send_message(chat_id=cid, text=txt, reply_markup=get_game_kb(status))
 
-# /start əmri (şəxsi mesaj üçün)
+# --- DİL SEÇİMİ VƏ START ---
 @dp.message(Command("start"))
 async def start_cmd(m: types.Message):
     if m.chat.type == "private":
-        kb = InlineKeyboardBuilder()
-        kb.add(types.InlineKeyboardButton(text="👥 Məni qrupa əlavə et", url="https://t.me/CroniqueBot?startgroup=true"))
-        await m.answer("Salam! Mən Cro oyun Botuyam.. Qrupunuza əlavə edib adminlik verin və /game@CroniqueBot yazın.", reply_markup=kb.as_markup())
+        b = InlineKeyboardBuilder()
+        diller = [
+            ("🇬🇧 English", "en"), ("🇦🇿 Azərbaycan", "az"), 
+            ("🇹🇷 Türkçe", "tr"), ("🇫🇷 Français", "fr"), 
+            ("🇰🇿 Қазақша", "kk"), ("🇷🇺 Русский", "ru")
+        ]
+        for t, c in diller: b.add(types.InlineKeyboardButton(text=t, callback_data=f"lang_{c}"))
+        b.adjust(2)
+        await m.answer("Dilinizi seçin / Select your language:", reply_markup=b.as_markup())
 
-# Admin əmrləri
-@dp.message(F.text.contains(BOT_NAME))
+@dp.callback_query(F.data.startswith("lang_"))
+async def dil_secimi(c: types.CallbackQuery):
+    b = InlineKeyboardBuilder()
+    b.add(types.InlineKeyboardButton(text="👥 Məni qrupa əlavə et", url="https://t.me/CroniqueBot?startgroup=true"))
+    mesajlar = {
+        "az": "Salam! Mən Cro oyun Botuyam..\n\nQrupunuzda dostlarınızla oyun oynamaq üçün məni qrupunuza əlavə edin.\nSonra Adminlik verin və /game@CroniqueBot komandası ilə başlayın.",
+        "en": "Hello! I am Cro game Bot..\n\nAdd me to your group to play with your friends.\nGive me Admin rights and start with /game@CroniqueBot.",
+        "tr": "Merhaba! Ben Cro oyun Botuyum..\n\nArkadaşlarınızla oynamak için beni grubunuza ekleyin.\nSonra Yönetici yetkisi verin ve /game@CroniqueBot komutuyla oyunu başlatın.",
+        "ru": "Привет! Я игровой бот Cro..\n\nДобавьте меня в группу, дайте права админа и начните с /game@CroniqueBot.",
+        "fr": "Bonjour! Je suis le bot Cro..\n\nAjoutez-moi à votre groupe, donnez-moi les droits d'admin et commencez avec /game@CroniqueBot.",
+        "kk": "Сәлем! Мен Cro ботымын..\n\nТобыңызға қосыңыз, әкімші құқығын беріңіз және /game@CroniqueBot деп бастаңыз."
+    }
+    await c.message.edit_text(mesajlar.get(c.data.split("_")[1], mesajlar["az"]), reply_markup=b.as_markup())
+
+# --- ADMIN ƏMRLƏRİ ---
+@dp.message(F.text.endswith(BOT_NAME))
 async def command_handler(m: types.Message):
     cmd = m.text.lower().split("@")[0]
     cid, uid, uname = m.chat.id, m.from_user.id, m.from_user.full_name
@@ -359,14 +379,14 @@ async def command_handler(m: types.Message):
     elif cmd == "/kick":
         if cid in aktiv_oyunlar:
             del aktiv_oyunlar[cid]
-            await m.answer("Aparıcı çıxarıldı. Yeni aparıcı olmaq üçün düyməyə basın:", reply_markup=get_game_kb("gozlemede"))
+            await m.answer("Aparıcı dəyişdirildi. Yeni aparıcı olmaq üçün düyməyə basın:", reply_markup=get_game_kb("gozlemede"))
     elif cmd == "/rating":
         b = InlineKeyboardBuilder()
         b.row(types.InlineKeyboardButton(text="🏆 Ümumi Reytinq", callback_data="rank_total"))
         b.row(types.InlineKeyboardButton(text="🎯 Cari Oyun Reytinqi", callback_data="rank_round"))
         await m.answer("Reytinq növünü seçin:", reply_markup=b.as_markup())
 
-# Oyun cavablarını yoxlayan handler
+# Oyun cavabları
 @dp.message(F.text & ~F.text.startswith("/"))
 async def check_answer(m: types.Message):
     cid = m.chat.id
@@ -375,7 +395,7 @@ async def check_answer(m: types.Message):
         await m.answer(f"✅ Düzgündür! {m.from_user.full_name} +1 qələbə qazandı.")
         await yeni_raund(cid, m.from_user.id, m.from_user.full_name)
 
-# Bütün düymə klikləri
+# Callback handler
 @dp.callback_query()
 async def cb_handler(c: types.CallbackQuery):
     cid = c.message.chat.id
