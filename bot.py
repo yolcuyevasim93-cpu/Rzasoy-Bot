@@ -318,16 +318,16 @@ def get_game_kb(status="aktiv"):
     if status == "gozlemede":
         b.add(types.InlineKeyboardButton(text="Aparıcı olmaq istəyirəm ✅", callback_data="aparici_ol"))
     else:
-        b.add(types.InlineKeyboardButton(text="Sözə Baxmaq 🔍", callback_data="soze_bax"))
-        b.add(types.InlineKeyboardButton(text="Fikrimi Dəyişdim ❌", callback_data="fikrimi_deyisdim"))
-        b.add(types.InlineKeyboardButton(text="Növbəti Söz ♻️", callback_data="novbeti_soz"))
+        b.add(types.InlineKeyboardButton(text="Sözə baxmaq 🔍", callback_data="soze_bax"))
+        b.add(types.InlineKeyboardButton(text="Fikrimi dəyişdim ❌", callback_data="fikrimi_deyisdim"))
+        b.add(types.InlineKeyboardButton(text="Növbəti söz ♻️", callback_data="novbeti_soz"))
     b.adjust(1)
     return b.as_markup()
 
 async def yeni_raund(cid, uid=None, uname=None, mid=None, status="aktiv"):
     sz = random.choice(SOZLER)
     aktiv_oyunlar[cid] = {"soz": sz.lower().strip(), "orig": sz, "uid": uid, "un": uname}
-    txt = f'<a href="tg://user?id={uid}">{uname}</a> - sözü izah edir' if uid else "Oyun gözləmədədir..."
+    txt = f'<a href="tg://user?id={uid}">{uname}</a> - Sözü izah edir' if uid else "Oyun gözləmədədir..."
     if mid:
         try: await bot.edit_message_text(chat_id=cid, message_id=mid, text=txt, reply_markup=get_game_kb(status))
         except: pass
@@ -405,15 +405,26 @@ async def cb_handler(c: types.CallbackQuery):
         txt = f"📊 <b>Reytinq ({mode.upper()}):</b>\n\n"
         for i, (uid, d) in enumerate(users[:20]): txt += f"{i+1}. {d['name']} - {d[mode]} qələbə\n"
         await c.message.edit_text(txt, reply_markup=None)
-    elif c.data == "soze_bax": await c.answer(aktiv_oyunlar[cid]['orig'], show_alert=True)
+    
+    elif c.data == "soze_bax":
+        if c.from_user.id != aktiv_oyunlar[cid].get("uid"):
+            await c.answer("⚠️ Aparıcı deyilsiniz!", show_alert=True)
+        else:
+            await c.answer(aktiv_oyunlar[cid]['orig'], show_alert=True)
+            
     elif c.data == "fikrimi_deyisdim":
         del aktiv_oyunlar[cid]
         await c.message.edit_text("Aparıcı dəyişir...", reply_markup=get_game_kb("gozlemede"))
+    
     elif c.data == "aparici_ol": await yeni_raund(cid, c.from_user.id, c.from_user.full_name, c.message.message_id)
+    
     elif c.data == "novbeti_soz":
-        sz = random.choice(SOZLER)
-        aktiv_oyunlar[cid].update({"soz": sz.lower().strip(), "orig": sz})
-        await c.answer("Yeni söz seçildi!", show_alert=True)
+        if c.from_user.id != aktiv_oyunlar[cid].get("uid"):
+            await c.answer("⚠️ Aparıcı deyilsiniz!", show_alert=True)
+        else:
+            sz = random.choice(SOZLER)
+            aktiv_oyunlar[cid].update({"soz": sz.lower().strip(), "orig": sz})
+            await c.answer(f"Yeni söz: {sz}", show_alert=True)
 
 async def main():
     Thread(target=run_flask, daemon=True).start()
