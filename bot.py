@@ -311,11 +311,12 @@ SOZLER = ["Abraham Linkoln", "Allergiya", "Angina", "Anemiya", "Astma", "Atatür
 # Reytinq üçün yeni dəyişən
 reytinq_db = {} 
 
-def update_score(cid, uid, points=10):
+def update_score(cid, uid, uname):
     if cid not in reytinq_db: reytinq_db[cid] = {}
-    if uid not in reytinq_db[cid]: reytinq_db[cid][uid] = {"total": 0, "round": 0}
-    reytinq_db[cid][uid]["total"] += points
-    reytinq_db[cid][uid]["round"] += points
+    if uid not in reytinq_db[cid]: 
+        reytinq_db[cid][uid] = {"name": uname, "total": 0, "round": 0}
+    reytinq_db[cid][uid]["total"] += 1
+    reytinq_db[cid][uid]["round"] += 1
     
 # Keyboardlar
 def dil_secimi_kb():
@@ -338,6 +339,12 @@ def get_game_kb(status="aktiv"):
     b.adjust(1)
     return b.as_markup()
 
+async def yeni_raund(cid, ...):
+    # Cari oyun reytinqini sıfırla
+    if cid in reytinq_db:
+        for u in reytinq_db[cid]: reytinq_db[cid][u]["round"] = 0
+    # ... qalan kodlar ...
+
 # Oyun məntiqi
 async def yeni_raund(cid, uid, uname, mid=None):
     sz = random.choice(SOZLER)
@@ -352,7 +359,7 @@ async def yeni_raund(cid, uid, uname, mid=None):
 # --- REYTİNQ SİSTEMİ BAŞLAYIR ---
 reytinq_db = {} 
 
-def update_score(cid, uid, points=10):
+def ən(cid, uid, points=10):
     if cid not in reytinq_db: reytinq_db[cid] = {}
     if uid not in reytinq_db[cid]: reytinq_db[cid][uid] = {"total": 0, "round": 0}
     reytinq_db[cid][uid]["total"] += points
@@ -368,12 +375,18 @@ async def rating_menu(m: types.Message):
 @dp.callback_query(F.data.startswith("rank_"))
 async def show_rank(c: types.CallbackQuery):
     cid = c.message.chat.id
-    mode = c.data.split("_")[1]
+    mode = c.data.split("_")[1] # total və ya round
     if cid not in reytinq_db or not reytinq_db[cid]: return await c.answer("Məlumat yoxdur!")
+    
     users = sorted(reytinq_db[cid].items(), key=lambda x: x[1][mode], reverse=True)
-    txt = f"📊 <b>Reytinq ({mode.upper()}):</b>\n\n" + "\n".join([f"{i+1}. {uid}: {d[mode]} xal" for i, (uid, d) in enumerate(users[:5])])
-    await c.message.edit_text(txt)
-# --- REYTİNQ SİSTEMİ BİTİR ---
+    
+    txt = f"📊 <b>Reytinq ({'Ümumi' if mode == 'total' else 'Cari Oyun'}):</b>\n\n"
+    for i, (uid, d) in enumerate(users[:20]):
+        # Adın üzərinə basdıqda profilə yönləndirir
+        txt += f"{i+1}. <a href='tg://user?id={uid}'>{d['name']}</a>: {d[mode]} qələbə\n"
+    
+    await c.message.edit_text(txt, disable_web_page_preview=True)
+    
                  
 # Handlerlər
 @dp.message(Command("start"))
@@ -398,9 +411,11 @@ async def chk(m: types.Message):
 
     if msg == "/game" + BOT_NAME:
         if m.chat.type not in ["group", "supergroup"]: return await m.answer("Qrupda oynayın!")
-        if cid in aktiv_oyunlar and aktiv_oyunlar[cid].get("st") == "aktiv": return await m.answer("⚠️ Aktiv oyun var!")
-        await yeni_raund(cid, uid, uname)
-        return
+            if cid in aktiv_oyunlar and msg == aktiv_oyunlar[cid]["soz"]:
+        update_score(cid, m.from_user.id, m.from_user.full_name) # Adı da göndəririk
+        await m.answer(f"✅ Düzgündür! {m.from_user.full_name} +1 qələbə qazandı.")
+        await yeni_raund(cid)
+    
 
     if cid not in aktiv_oyunlar: return
     g = aktiv_oyunlar[cid]
@@ -433,10 +448,13 @@ async def cb(c: types.CallbackQuery):
 
 async def main():
     Thread(target=run_flask, daemon=True).start()
-    # Donmanı bitirən əsas hissə:
-    await bot.delete_webhook(drop_pending_updates=True) 
+    await bot.delete_webhook(drop_pending_updates=True)
     print("Bot işə düşdü...")
     await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    
     
 if __name__ == "__main__":
     asyncio.run(main())
