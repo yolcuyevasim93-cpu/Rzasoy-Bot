@@ -8,7 +8,7 @@ from aiogram.client.default import DefaultBotProperties
 from flask import Flask
 from threading import Thread
 
-BOT_TOKEN = "8421111075:AAHgXuErU8P8pao0YE_uaPWDhiMk066QKMg"
+BOT_TOKEN = "8421111075:AAHaLb1nnftfaPt8iEHyCKA7EDFN0zw8Vrk"
 BOT_NAME = "@CroniqueBot".lower()
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
