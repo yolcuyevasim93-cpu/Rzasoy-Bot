@@ -362,14 +362,15 @@ async def yeni_raund(cid, uid, uname, mid=None):
     else:
         await bot.send_message(chat_id=cid, text=txt, reply_markup=get_game_kb())
 
-# --- REYTİNQ SİSTEMİ BAŞLAYIR ---
+# --- REYTİNQ SİSTEMİ ---
 reytinq_db = {} 
 
-def ən(cid, uid, points=10):
+def update_score(cid, uid, uname):
     if cid not in reytinq_db: reytinq_db[cid] = {}
-    if uid not in reytinq_db[cid]: reytinq_db[cid][uid] = {"total": 0, "round": 0}
-    reytinq_db[cid][uid]["total"] += points
-    reytinq_db[cid][uid]["round"] += points
+    if uid not in reytinq_db[cid]: 
+        reytinq_db[cid][uid] = {"name": uname, "total": 0, "round": 0}
+    reytinq_db[cid][uid]["total"] += 1
+    reytinq_db[cid][uid]["round"] += 1
 
 @dp.message(Command("rating"))
 async def rating_menu(m: types.Message):
@@ -381,19 +382,17 @@ async def rating_menu(m: types.Message):
 @dp.callback_query(F.data.startswith("rank_"))
 async def show_rank(c: types.CallbackQuery):
     cid = c.message.chat.id
-    mode = c.data.split("_")[1] # total və ya round
-    if cid not in reytinq_db or not reytinq_db[cid]: return await c.answer("Məlumat yoxdur!")
+    mode = c.data.split("_")[1]
+    if cid not in reytinq_db or not reytinq_db[cid]: 
+        return await c.answer("Məlumat yoxdur!", show_alert=True)
     
     users = sorted(reytinq_db[cid].items(), key=lambda x: x[1][mode], reverse=True)
-    
     txt = f"📊 <b>Reytinq ({'Ümumi' if mode == 'total' else 'Cari Oyun'}):</b>\n\n"
     for i, (uid, d) in enumerate(users[:20]):
-        # Adın üzərinə basdıqda profilə yönləndirir
         txt += f"{i+1}. <a href='tg://user?id={uid}'>{d['name']}</a>: {d[mode]} qələbə\n"
-    
     await c.message.edit_text(txt, disable_web_page_preview=True)
-    
-                 
+# --- SON ---
+
 # Handlerlər
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
@@ -415,12 +414,16 @@ async def chk(m: types.Message):
     cid, uid, uname = m.chat.id, m.from_user.id, m.from_user.full_name
     msg = m.text.lower().strip()
 
+    # 417-ci sətir ətrafı
     if msg == "/game" + BOT_NAME:
         if m.chat.type not in ["group", "supergroup"]: return await m.answer("Qrupda oynayın!")
-            if cid in aktiv_oyunlar and msg == aktiv_oyunlar[cid]["soz"]:
-        update_score(cid, m.from_user.id, m.from_user.full_name) # Adı da göndəririk
-        await m.answer(f"✅ Düzgündür! {m.from_user.full_name} +1 qələbə qazandı.")
-        await yeni_raund(cid)
+        # 419-cu sətir:
+        if cid in aktiv_oyunlar and msg == aktiv_oyunlar[cid]["soz"]:
+            # BURA DİQQƏT ET: Bu 3 sətir if-in içindədir, ona görə 4-8 boşluq içəridə olmalıdır
+            update_score(cid, m.from_user.id, m.from_user.full_name) 
+            await m.answer(f"✅ Düzgündür! {m.from_user.full_name} +1 qələbə qazandı.")
+            await yeni_raund(cid)
+            
     
 
     if cid not in aktiv_oyunlar: return
