@@ -309,6 +309,7 @@ def update_score(cid, uid, uname):
     reytinq_db[cid][uid]["round"] += 1
 
 async def is_admin(m: types.Message):
+    if m.chat.type == "private": return True
     member = await bot.get_chat_member(m.chat.id, m.from_user.id)
     return member.status in ['administrator', 'creator']
 
@@ -333,41 +334,66 @@ async def yeni_raund(cid, uid=None, uname=None, mid=None, status="aktiv"):
     else:
         await bot.send_message(chat_id=cid, text=txt, reply_markup=get_game_kb(status))
 
-@dp.message(F.text.endswith(BOT_NAME))
+# /start əmri (şəxsi mesaj üçün)
+@dp.message(Command("start"))
+async def start_cmd(m: types.Message):
+    if m.chat.type == "private":
+        kb = InlineKeyboardBuilder()
+        kb.add(types.InlineKeyboardButton(text="👥 Məni qrupa əlavə et", url="https://t.me/CroniqueBot?startgroup=true"))
+        await m.answer("Salam! Mən Cro oyun Botuyam.. Qrupunuza əlavə edib adminlik verin və /game@CroniqueBot yazın.", reply_markup=kb.as_markup())
+
+# Admin əmrləri
+@dp.message(F.text.contains(BOT_NAME))
 async def command_handler(m: types.Message):
     cmd = m.text.lower().split("@")[0]
     cid, uid, uname = m.chat.id, m.from_user.id, m.from_user.full_name
     
-    # Admin yoxlanışı
-    if cmd in ["/game", "/stop", "/kick", "/rating"]:
-        if not await is_admin(m): return await m.answer("Bu əmri yalnız adminlər istifadə edə bilər!")
+    if not await is_admin(m): return await m.answer("Bu əmri yalnız adminlər istifadə edə bilər!")
 
-    if cmd == "/game":
-        await yeni_raund(cid, uid, uname)
+    if cmd == "/game": await yeni_raund(cid, uid, uname)
     elif cmd == "/stop":
         if cid in reytinq_db:
-            for u in reytinq_db[cid]: reytinq_db[cid][u]["round"] = 0 # Cari oyun 0-lanır, total qalır
+            for u in reytinq_db[cid]: reytinq_db[cid][u]["round"] = 0
         if cid in aktiv_oyunlar: del aktiv_oyunlar[cid]
         await m.answer("Oyun dayandırıldı, cari oyun reytinqi sıfırlandı!")
     elif cmd == "/kick":
         if cid in aktiv_oyunlar:
             del aktiv_oyunlar[cid]
-            await m.answer("Aparıcı dəyişdirildi. Yeni aparıcı olmaq üçün düyməyə basın:", reply_markup=get_game_kb("gozlemede"))
+            await m.answer("Aparıcı çıxarıldı. Yeni aparıcı olmaq üçün düyməyə basın:", reply_markup=get_game_kb("gozlemede"))
     elif cmd == "/rating":
         b = InlineKeyboardBuilder()
         b.row(types.InlineKeyboardButton(text="🏆 Ümumi Reytinq", callback_data="rank_total"))
         b.row(types.InlineKeyboardButton(text="🎯 Cari Oyun Reytinqi", callback_data="rank_round"))
         await m.answer("Reytinq növünü seçin:", reply_markup=b.as_markup())
 
-@dp.callback_query(F.data.startswith("rank_"))
-async def show_rank(c: types.CallbackQuery):
-    cid, mode = c.message.chat.id, c.data.split("_")[1]
-    users = sorted(reytinq_db.get(cid, {}).items(), key=lambda x: x[1][mode], reverse=True)
-    txt = f"📊 <b>Reytinq ({mode.upper()}):</b>\n\n"
-    for i, (uid, d) in enumerate(users[:20]): txt += f"{i+1}. {d['name']} - {d[mode]} qələbə\n"
-    await c.message.edit_text(txt)
+# Oyun cavablarını yoxlayan handler
+@dp.message(F.text & ~F.text.startswith("/"))
+async def check_answer(m: types.Message):
+    cid = m.chat.id
+    if cid in aktiv_oyunlar and m.text.lower().strip() == aktiv_oyunlar[cid]["soz"]:
+        update_score(cid, m.from_user.id, m.from_user.full_name)
+        await m.answer(f"✅ Düzgündür! {m.from_user.full_name} +1 qələbə qazandı.")
+        await yeni_raund(cid, m.from_user.id, m.from_user.full_name)
 
-# Callback və digər mesajlar qalır... (yeni_raund və s. kimi)
+# Bütün düymə klikləri
+@dp.callback_query()
+async def cb_handler(c: types.CallbackQuery):
+    cid = c.message.chat.id
+    if c.data.startswith("rank_"):
+        mode = c.data.split("_")[1]
+        users = sorted(reytinq_db.get(cid, {}).items(), key=lambda x: x[1][mode], reverse=True)
+        txt = f"📊 <b>Reytinq ({mode.upper()}):</b>\n\n"
+        for i, (uid, d) in enumerate(users[:20]): txt += f"{i+1}. {d['name']} - {d[mode]} qələbə\n"
+        await c.message.edit_text(txt, reply_markup=None)
+    elif c.data == "soze_bax": await c.answer(aktiv_oyunlar[cid]['orig'], show_alert=True)
+    elif c.data == "fikrimi_deyisdim":
+        del aktiv_oyunlar[cid]
+        await c.message.edit_text("Aparıcı dəyişir...", reply_markup=get_game_kb("gozlemede"))
+    elif c.data == "aparici_ol": await yeni_raund(cid, c.from_user.id, c.from_user.full_name, c.message.message_id)
+    elif c.data == "novbeti_soz":
+        sz = random.choice(SOZLER)
+        aktiv_oyunlar[cid].update({"soz": sz.lower().strip(), "orig": sz})
+        await c.answer("Yeni söz seçildi!", show_alert=True)
 
 async def main():
     Thread(target=run_flask, daemon=True).start()
