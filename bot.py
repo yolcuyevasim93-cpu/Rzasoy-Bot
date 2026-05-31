@@ -308,6 +308,15 @@ SOZLER = ["Abraham Linkoln", "Allergiya", "Angina", "Anemiya", "Astma", "Atatür
     "Pantomima", "Paralel", "Paraşüt", "Park", "Parket", "Pasport", "Pedaqoq", "Pencərə", "Pensiya", 
     "Pərgar", "Pələng", "Pərdə", "Perimetr", "Peyk", "Piknik", "Piləkən", "Pilot", "Pinqvin", "Pion",  "Alma", "Bakı", "Kompüter", "Telegram", "Avtomobil", "Kitab"]
 
+# Reytinq üçün yeni dəyişən
+reytinq_db = {} 
+
+def update_score(cid, uid, points=10):
+    if cid not in reytinq_db: reytinq_db[cid] = {}
+    if uid not in reytinq_db[cid]: reytinq_db[cid][uid] = {"total": 0, "round": 0}
+    reytinq_db[cid][uid]["total"] += points
+    reytinq_db[cid][uid]["round"] += points
+    
 # Keyboardlar
 def dil_secimi_kb():
     b = InlineKeyboardBuilder()
@@ -340,6 +349,32 @@ async def yeni_raund(cid, uid, uname, mid=None):
     else:
         await bot.send_message(chat_id=cid, text=txt, reply_markup=get_game_kb())
 
+# --- REYTİNQ SİSTEMİ BAŞLAYIR ---
+reytinq_db = {} 
+
+def update_score(cid, uid, points=10):
+    if cid not in reytinq_db: reytinq_db[cid] = {}
+    if uid not in reytinq_db[cid]: reytinq_db[cid][uid] = {"total": 0, "round": 0}
+    reytinq_db[cid][uid]["total"] += points
+    reytinq_db[cid][uid]["round"] += points
+
+@dp.message(Command("rating"))
+async def rating_menu(m: types.Message):
+    b = InlineKeyboardBuilder()
+    b.row(types.InlineKeyboardButton(text="🏆 Ümumi Reytinq", callback_data="rank_total"))
+    b.row(types.InlineKeyboardButton(text="🎯 Bu Oyunun Reytinqi", callback_data="rank_round"))
+    await m.answer("Reytinq növünü seçin:", reply_markup=b.as_markup())
+
+@dp.callback_query(F.data.startswith("rank_"))
+async def show_rank(c: types.CallbackQuery):
+    cid = c.message.chat.id
+    mode = c.data.split("_")[1]
+    if cid not in reytinq_db or not reytinq_db[cid]: return await c.answer("Məlumat yoxdur!")
+    users = sorted(reytinq_db[cid].items(), key=lambda x: x[1][mode], reverse=True)
+    txt = f"📊 <b>Reytinq ({mode.upper()}):</b>\n\n" + "\n".join([f"{i+1}. {uid}: {d[mode]} xal" for i, (uid, d) in enumerate(users[:5])])
+    await c.message.edit_text(txt)
+# --- REYTİNQ SİSTEMİ BİTİR ---
+                 
 # Handlerlər
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
@@ -397,17 +432,12 @@ async def cb(c: types.CallbackQuery):
 # ... (yuxarıdakı kodların hamısı olduğu kimi qalır)
 
 async def main():
-    # Flask serverini arxa planda başlat
     Thread(target=run_flask, daemon=True).start()
-    
-    # KÖHNƏ MESAJLARI SİL (Donmanı və gecikməni kəsən əsas hissə budur)
+    # Donmanı bitirən əsas hissə:
     await bot.delete_webhook(drop_pending_updates=True) 
-    
     print("Bot işə düşdü...")
-    
-    # Botu başlat
     await dp.start_polling(bot)
-
+    
 if __name__ == "__main__":
     asyncio.run(main())
     
