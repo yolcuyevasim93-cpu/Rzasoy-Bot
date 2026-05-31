@@ -394,10 +394,23 @@ async def cb(c: types.CallbackQuery):
         aktiv_oyunlar[cid].update({"soz": sz.lower().strip(), "orig": sz})
         await c.answer(sz, show_alert=True)
 
+# ... (yuxarıdakı kodların hamısı olduğu kimi qalır)
+
 async def main():
+    # Flask serverini arxa planda başlat
     Thread(target=run_flask, daemon=True).start()
+    
+    # KÖHNƏ MESAJLARI SİL (Donmanı və gecikməni kəsən əsas hissə budur)
+    await bot.delete_webhook(drop_pending_updates=True) 
+    
     print("Bot işə düşdü...")
+    
+    # Botu başlat
     await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    
 
 if __name__ == "__main__":
     asyncio.run(main())
